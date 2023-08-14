@@ -140,9 +140,9 @@ void driveStepper(steppers stp, int targetPos)
   /* increasing speed */
   for(int i = 0; i < slowSpdLoop; i++)
   {
-    pinMode(stp.stepPin, HIGH);
+    digitalWrite(stp.stepPin, HIGH);
     delayMicroseconds(slowSpdDelay);
-    pinMode(stp.stepPin, LOW);
+    digitalWrite(stp.stepPin, LOW);
     delayMicroseconds(slowSpdDelay);
     slowSpdDelay += delayIncAmount;
   }
@@ -150,18 +150,18 @@ void driveStepper(steppers stp, int targetPos)
   /* top speed section */
   for(int j = 0; j < topSpdLoop; j++)
   {
-    pinMode(stp.stepPin, HIGH);
+    digitalWrite(stp.stepPin, HIGH);
     delayMicroseconds(stp.topSpdDelay);
-    pinMode(stp.stepPin, LOW);
+    digitalWrite(stp.stepPin, LOW);
     delayMicroseconds(stp.topSpdDelay);
   }
   
   /* decreasing speed */
   for(int k = 0; k < slowSpdLoop; k++)
   {
-    pinMode(stp.stepPin, HIGH);
+    digitalWrite(stp.stepPin, HIGH);
     delayMicroseconds(slowSpdDelay);
-    pinMode(stp.stepPin, LOW);
+    digitalWrite(stp.stepPin, LOW);
     delayMicroseconds(slowSpdDelay);
     slowSpdDelay -= delayIncAmount;
   }
