@@ -15,6 +15,9 @@ void loop()
 
 void find_direction()
 {
+    adcValue1 = analogRead(A0);
+    adcValue2 = analogRead(A1);
+
 		//Setting the blind spot
 		if(adcValue1 > 550)
 		{
