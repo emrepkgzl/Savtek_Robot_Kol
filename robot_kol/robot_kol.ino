@@ -28,7 +28,7 @@ void loop()
     Serial.println("Initialization faied!");
     for(;;);
   }
-  //findDirection(analogRead(A0), analogRead(A1));
+  findDirection(A0, A1);
   //delay(100);
 
   driveStepper(s1, 500); //example
@@ -144,7 +144,7 @@ void driveStepper(steppers stp, int targetPos)
     delayMicroseconds(slowSpdDelay);
     digitalWrite(stp.stepPin, LOW);
     delayMicroseconds(slowSpdDelay);
-    slowSpdDelay += delayIncAmount;
+    slowSpdDelay -= delayIncAmount;
   }
 
   /* top speed section */
@@ -163,12 +163,14 @@ void driveStepper(steppers stp, int targetPos)
     delayMicroseconds(slowSpdDelay);
     digitalWrite(stp.stepPin, LOW);
     delayMicroseconds(slowSpdDelay);
-    slowSpdDelay -= delayIncAmount;
+    slowSpdDelay += delayIncAmount;
   }
 }
 
-void findDirection(int adcValue1, int adcValue2)
+void findDirection(byte analogPin1, byte analogPin2)
 {
+    adcValue1 = analogRead(analogPin1);
+    adcValue2 = analogRead(analogPin2);
 
 		/* set the blind spot */
 		if(adcValue1 > 550)
