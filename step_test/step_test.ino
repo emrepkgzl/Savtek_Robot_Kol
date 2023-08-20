@@ -1,19 +1,20 @@
-#define Direction 0
-#define Step      1
+#define DIRECTION 0
+#define STEP      1
 
-void setup() {
-  pinMode(Direction, OUTPUT);
-  pinMode(Step, OUTPUT);
+void setup() 
+{
+  pinMode(DIRECTION, OUTPUT);
+  pinMode(STEP, OUTPUT);
 
-  digitalWrite(0,HIGH);
-  for(int x = 0; x < 100; x++) 
+  digitalWrite(DIRECTION, HIGH);
+  delay(100);
+  for(int x = 0; x < 1074; x++) 
   {
-    digitalWrite(Step, HIGH);
-    delayMicroseconds(5000);
-    digitalWrite(Step, LOW);
-    delayMicroseconds(5000);
+    digitalWrite(STEP, HIGH);
+    delayMicroseconds(1000);
+    digitalWrite(STEP, LOW);
+    delayMicroseconds(1000);
   }
-  
 }
 
 void loop() 
