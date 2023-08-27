@@ -1,3 +1,5 @@
+#define EN        8
+
 int  adcValue1         = 0x00;
 int  adcValue2         = 0x00;
 int  direction_info    = 0x00;
@@ -10,6 +12,7 @@ typedef struct
   int currentPos;
   int topSpdDelay;
   int slowSpdDelay;
+  float acclrt_ratio;
 }
 steppers;
 
@@ -28,23 +31,25 @@ void loop()
     Serial.println("Initialization faied!");
     for(;;);
   }
-  findDirection(A0, A1);
+  //findDirection(A0, A1);
   //delay(100);
 
-  driveStepper(s1, 500); //example
+  driveStepper(s1, 5000); //example
   for(;;);
 }
 
 bool initSteppers()
 {
   // steppers s1, s2, s3, s4, s5, s6, s7, s8;
+  pinMode(EN, OUTPUT);
 
-  s1.stepPin = 0;
-  s1.dirPin = 1;
-  s1.limit = 1000;
+  s1.stepPin = 2;
+  s1.dirPin = 5;
+  s1.limit = 4000;
   s1.currentPos = 0;
-  s1.topSpdDelay = 1000;
-  s1.slowSpdDelay = 10000;
+  s1.topSpdDelay = 300;
+  s1.slowSpdDelay = 6000;
+  s1.acclrt_ratio = 0.9975;
 
   pinMode(s1.stepPin, OUTPUT);
   pinMode(s1.dirPin, OUTPUT);
@@ -55,6 +60,7 @@ bool initSteppers()
   // s2.currentPos = 0;
   // s2.topSpdDelay = 1000;
   // s2.slowSpdDelay = 10000;
+  // s2.acclrt_ratio = 0.9975;
 
   // pinMode(s2.stepPin, OUTPUT);
   // pinMode(s2.dirPin, OUTPUT);
@@ -65,6 +71,7 @@ bool initSteppers()
   // s3.currentPos = 0;
   // s3.topSpdDelay = 1000;
   // s3.slowSpdDelay = 10000;
+  // s3.acclrt_ratio = 0.9975;
 
   // pinMode(s3.stepPin, OUTPUT);
   // pinMode(s3.dirPin, OUTPUT);
@@ -75,6 +82,7 @@ bool initSteppers()
   // s4.currentPos = 0;
   // s4.topSpdDelay = 1000;
   // s4.slowSpdDelay = 10000;
+  // s4.acclrt_ratio = 0.9975;
 
   // pinMode(s4.stepPin, OUTPUT);
   // pinMode(s4.dirPin, OUTPUT);
@@ -85,6 +93,7 @@ bool initSteppers()
   // s5.currentPos = 0;
   // s5.topSpdDelay = 1000;
   // s5.slowSpdDelay = 10000;
+  // s5.acclrt_ratio = 0.9975;
 
   // pinMode(s5.stepPin, OUTPUT);
   // pinMode(s5.dirPin, OUTPUT);
@@ -95,6 +104,7 @@ bool initSteppers()
   // s6.currentPos = 0;
   // s6.topSpdDelay = 1000;
   // s6.slowSpdDelay = 10000;
+  // s6.acclrt_ratio = 0.9975;
 
   // pinMode(s6.stepPin, OUTPUT);
   // pinMode(s6.dirPin, OUTPUT);
@@ -105,6 +115,7 @@ bool initSteppers()
   // s7.currentPos = 0;
   // s7.topSpdDelay = 1000;
   // s7.slowSpdDelay = 10000;
+  // s7.acclrt_ratio = 0.9975;
 
   // pinMode(s7.stepPin, OUTPUT);
   // pinMode(s7.dirPin, OUTPUT);
@@ -115,6 +126,7 @@ bool initSteppers()
   // s8.currentPos = 0;
   // s8.topSpdDelay = 1000;
   // s8.slowSpdDelay = 10000;
+  // s8.acclrt_ratio = 0.9975;
 
   // pinMode(s8.stepPin, OUTPUT);
   // pinMode(s8.dirPin, OUTPUT);
@@ -124,6 +136,9 @@ bool initSteppers()
 
 void driveStepper(steppers stp, int targetPos)
 {
+  /* enable stepper */
+  digitalWrite(EN, LOW);
+
   /* check for limits */
   targetPos > stp.limit ? targetPos = stp.limit : targetPos = targetPos;
   targetPos < 0 ? targetPos = 0 : targetPos = targetPos;
@@ -131,21 +146,40 @@ void driveStepper(steppers stp, int targetPos)
   targetPos > stp.currentPos ? pinMode(stp.dirPin, LOW) : pinMode(stp.dirPin, HIGH);
   /* calculations for accelerating */
   int positionDiff = abs(stp.currentPos - targetPos);
-  int slowSpdLoop = positionDiff / 20;
-  slowSpdLoop > 100 ? slowSpdLoop = 100 : slowSpdLoop = slowSpdLoop;
-  int topSpdLoop = positionDiff - (2 * slowSpdLoop);
-  int slowSpdDelay = stp.slowSpdDelay;
-  int delayIncAmount = (stp.topSpdDelay - stp.slowSpdDelay) / slowSpdLoop;
+  float slowSpdDelay = stp.slowSpdDelay;
+  int counter = 0;
+  int topSpdLoop;
+
+  Serial.print("target pos: ");
+  Serial.println(targetPos);
+
+  Serial.print("current pos: ");
+  Serial.println(stp.currentPos);
+
+  Serial.print("position diff: ");
+  Serial.println(positionDiff);
+
+  Serial.print("topSpdLoop: ");
+  Serial.println(topSpdLoop);
+
+  Serial.print("slowSpdDelay: ");
+  Serial.println(slowSpdDelay);
+
+  Serial.print("topSpdDelay: ");
+  Serial.println(stp.topSpdDelay);
 
   /* increasing speed */
-  for(int i = 0; i < slowSpdLoop; i++)
+  while(slowSpdDelay > stp.topSpdDelay)
   {
     digitalWrite(stp.stepPin, HIGH);
     delayMicroseconds(slowSpdDelay);
     digitalWrite(stp.stepPin, LOW);
     delayMicroseconds(slowSpdDelay);
-    slowSpdDelay -= delayIncAmount;
+    slowSpdDelay *= stp.acclrt_ratio;
+    counter++;
   }
+
+  topSpdLoop = positionDiff - (2 * counter);
 
   /* top speed section */
   for(int j = 0; j < topSpdLoop; j++)
@@ -157,14 +191,18 @@ void driveStepper(steppers stp, int targetPos)
   }
   
   /* decreasing speed */
-  for(int k = 0; k < slowSpdLoop; k++)
+  while(slowSpdDelay < stp.slowSpdDelay)
   {
     digitalWrite(stp.stepPin, HIGH);
     delayMicroseconds(slowSpdDelay);
     digitalWrite(stp.stepPin, LOW);
     delayMicroseconds(slowSpdDelay);
-    slowSpdDelay += delayIncAmount;
+    slowSpdDelay /= stp.acclrt_ratio;
   }
+
+
+  /* enable stepper */
+  digitalWrite(EN, HIGH);
 }
 
 void findDirection(byte analogPin1, byte analogPin2)
