@@ -1,8 +1,11 @@
 #define EN        8
 
-int  adcValue1         = 0x00;
-int  adcValue2         = 0x00;
-int  direction_info    = 0x00;
+int   adcValue1         = 0;
+int   adcValue2         = 0;
+int   direction_info    = 0;
+int   direction         = 0;
+bool  counter           = false;
+float ssDelay;
 
 typedef struct
 {
@@ -21,21 +24,19 @@ steppers s1;
 void setup()
 {
   Serial.begin(9600);
-}
 
-void loop()
-{
-  
   if(!initSteppers())
   {
     Serial.println("Initialization faied!");
     for(;;);
   }
-  //findDirection(A0, A1);
-  //delay(100);
+}
 
-  driveStepper(s1, 5000); //example
-  for(;;);
+void loop()
+{
+  driveOnCommand(s1, findDirection(A0, A1));
+  // driveOnCommand(s1, findDummyDirection());
+  // driveToPosition(s1, 5000);
 }
 
 bool initSteppers()
@@ -49,7 +50,7 @@ bool initSteppers()
   s1.currentPos = 0;
   s1.topSpdDelay = 300;
   s1.slowSpdDelay = 6000;
-  s1.acclrt_ratio = 0.9975;
+  s1.acclrt_ratio = 0.995;
 
   pinMode(s1.stepPin, OUTPUT);
   pinMode(s1.dirPin, OUTPUT);
@@ -134,7 +135,132 @@ bool initSteppers()
   return true;
 }
 
-void driveStepper(steppers stp, int targetPos)
+void driveOnCommand(steppers _stp, int dirIn)
+{
+  if(!counter)
+  {
+    counter = true;
+    ssDelay = _stp.slowSpdDelay;
+  }
+
+  digitalWrite(EN, LOW);
+
+  if(dirIn == 1)
+  {
+    if(direction == 0)
+    {
+      /* accelerating */
+      direction = 1;
+      digitalWrite(_stp.dirPin, LOW);
+      while(ssDelay > _stp.topSpdDelay)
+      {
+        digitalWrite(_stp.stepPin, HIGH);
+        delayMicroseconds(ssDelay);
+        digitalWrite(_stp.stepPin, LOW);
+        delayMicroseconds(ssDelay);
+        ssDelay *= _stp.acclrt_ratio;
+        //Serial.println(ssDelay);
+      }
+    }
+
+    else if(direction == 2)
+    {
+      /* deaccelerating */
+      digitalWrite(_stp.dirPin, HIGH);
+      while(ssDelay < _stp.slowSpdDelay)
+      {
+        digitalWrite(_stp.stepPin, HIGH);
+        delayMicroseconds(ssDelay);
+        digitalWrite(_stp.stepPin, LOW);
+        delayMicroseconds(ssDelay);
+        ssDelay /= _stp.acclrt_ratio;
+      }
+
+      if(dirIn == 1)
+      {
+        /* accelerating */
+        direction = 1;
+        digitalWrite(_stp.dirPin, LOW);
+        while(ssDelay > _stp.topSpdDelay)
+        {
+          digitalWrite(_stp.stepPin, HIGH);
+          delayMicroseconds(ssDelay);
+          digitalWrite(_stp.stepPin, LOW);
+          delayMicroseconds(ssDelay);
+          ssDelay *= _stp.acclrt_ratio;
+        }
+      }
+    }
+
+    /* top speed driving */
+    if(ssDelay <= _stp.topSpdDelay)
+    {
+      digitalWrite(_stp.stepPin, HIGH);
+      delayMicroseconds(_stp.topSpdDelay); 
+      digitalWrite(_stp.stepPin, LOW);
+      delayMicroseconds(_stp.topSpdDelay);
+    }
+  }
+
+  else if(dirIn == 2)
+  {
+
+    if(direction == 0)
+    {
+      /* accelerating */
+      direction = 2;
+      digitalWrite(_stp.dirPin, HIGH);
+      while(ssDelay > _stp.topSpdDelay)
+      {
+        digitalWrite(_stp.stepPin, HIGH);
+        delayMicroseconds(ssDelay);
+        digitalWrite(_stp.stepPin, LOW);
+        delayMicroseconds(ssDelay);
+        ssDelay *= _stp.acclrt_ratio;
+      }
+    }
+
+    else if(direction == 1)
+    {
+      /* deaccelerating */
+      digitalWrite(_stp.dirPin, LOW);
+      while(ssDelay < _stp.slowSpdDelay)
+      {
+        digitalWrite(_stp.stepPin, HIGH);
+        delayMicroseconds(ssDelay);
+        digitalWrite(_stp.stepPin, LOW);
+        delayMicroseconds(ssDelay);
+        ssDelay /= _stp.acclrt_ratio;
+      }
+
+      if(dirIn == 2)
+      {
+        /* accelerating */
+        direction = 2;
+        digitalWrite(_stp.dirPin, HIGH);
+        while(ssDelay > _stp.topSpdDelay)
+        {
+          digitalWrite(_stp.stepPin, HIGH);
+          delayMicroseconds(ssDelay);
+          digitalWrite(_stp.stepPin, LOW);
+          delayMicroseconds(ssDelay);
+          ssDelay *= _stp.acclrt_ratio;
+        }
+      }
+    }
+
+    /* top speed driving */
+    if(ssDelay <= _stp.topSpdDelay)
+    {
+      digitalWrite(_stp.stepPin, HIGH);
+      delayMicroseconds(_stp.topSpdDelay); 
+      digitalWrite(_stp.stepPin, LOW);
+      delayMicroseconds(_stp.topSpdDelay);
+    }
+  }
+}
+
+void driveToPosition(steppers stp, int targetPos)
 {
   /* enable stepper */
   digitalWrite(EN, LOW);
@@ -143,30 +269,32 @@ void driveStepper(steppers stp, int targetPos)
   targetPos > stp.limit ? targetPos = stp.limit : targetPos = targetPos;
   targetPos < 0 ? targetPos = 0 : targetPos = targetPos;
   /* check for direction */
-  targetPos > stp.currentPos ? pinMode(stp.dirPin, LOW) : pinMode(stp.dirPin, HIGH);
+  targetPos > stp.currentPos ? digitalWrite(stp.dirPin, LOW) : digitalWrite(stp.dirPin, HIGH);
   /* calculations for accelerating */
   int positionDiff = abs(stp.currentPos - targetPos);
   float slowSpdDelay = stp.slowSpdDelay;
   int counter = 0;
   int topSpdLoop;
+  
+  /* for debugging */
 
-  Serial.print("target pos: ");
-  Serial.println(targetPos);
+  // Serial.print("target pos: ");
+  // Serial.println(targetPos);
 
-  Serial.print("current pos: ");
-  Serial.println(stp.currentPos);
+  // Serial.print("current pos: ");
+  // Serial.println(stp.currentPos);
 
-  Serial.print("position diff: ");
-  Serial.println(positionDiff);
+  // Serial.print("position diff: ");
+  // Serial.println(positionDiff);
 
-  Serial.print("topSpdLoop: ");
-  Serial.println(topSpdLoop);
+  // Serial.print("topSpdLoop: ");
+  // Serial.println(topSpdLoop);
 
-  Serial.print("slowSpdDelay: ");
-  Serial.println(slowSpdDelay);
+  // Serial.print("slowSpdDelay: ");
+  // Serial.println(slowSpdDelay);
 
-  Serial.print("topSpdDelay: ");
-  Serial.println(stp.topSpdDelay);
+  // Serial.print("topSpdDelay: ");
+  // Serial.println(stp.topSpdDelay);
 
   /* increasing speed */
   while(slowSpdDelay > stp.topSpdDelay)
@@ -181,7 +309,7 @@ void driveStepper(steppers stp, int targetPos)
 
   topSpdLoop = positionDiff - (2 * counter);
 
-  /* top speed section */
+  /* top speed driving */
   for(int j = 0; j < topSpdLoop; j++)
   {
     digitalWrite(stp.stepPin, HIGH);
@@ -205,7 +333,7 @@ void driveStepper(steppers stp, int targetPos)
   digitalWrite(EN, HIGH);
 }
 
-void findDirection(byte analogPin1, byte analogPin2)
+bool findDirection(byte analogPin1, byte analogPin2)
 {
     adcValue1 = analogRead(analogPin1);
     adcValue2 = analogRead(analogPin2);
@@ -244,86 +372,111 @@ void findDirection(byte analogPin1, byte analogPin2)
 			if((adcValue1 > 0) && (adcValue2 == 0))
 			{
 				direction_info = 0x01; //RIGHT
-        Serial.print("Direction: ");
-        Serial.println("Right");
+        // Serial.print("Direction: ");
+        // Serial.println("Right");
 			}
 			else if((adcValue1 > 0) && (adcValue2 < 0))
 			{
 				if((adcValue1) > abs(adcValue2))
 				{
 					direction_info = 0x01; //RIGHT
-          Serial.print("Direction: ");
-          Serial.println("Right");
+          // Serial.print("Direction: ");
+          // Serial.println("Right");
 				}
 				else
 				{
 					direction_info = 0x08; //DOWN
-          Serial.print("Direction: ");
-          Serial.println("Down");
+          // Serial.print("Direction: ");
+          // Serial.println("Down");
+          return 1;
 				}
 			}
 			else if((adcValue1 == 0) && (adcValue2 < 0))
 			{
 				direction_info = 0x08; //DOWN
-          Serial.print("Direction: ");
-          Serial.println("Down");
+          // Serial.print("Direction: ");
+          // Serial.println("Down");
+          return 1;
 			}
 			else if((adcValue1 < 0) && (adcValue2 < 0))
 			{
 				if(abs(adcValue1) > abs(adcValue2))
 				{
 					direction_info = 0x02; //LEFT
-          Serial.print("Direction: ");
-          Serial.println("Left");
+          // Serial.print("Direction: ");
+          // Serial.println("Left");
 				}
 				else
 				{
 					direction_info = 0x08; //DOWN
-          Serial.print("Direction: ");
-          Serial.println("Down");
+          // Serial.print("Direction: ");
+          // Serial.println("Down");
+          return 1;
 				}
 			}
 			else if((adcValue1 < 0) && (adcValue2 == 0))
 			{
 				direction_info = 0x02; //LEFT
-        Serial.print("Direction: ");
-        Serial.println("Left");
+        // Serial.print("Direction: ");
+        // Serial.println("Left");
 			}
 			else if((adcValue1 < 0) && (adcValue2 > 0))
 			{
 				if(abs(adcValue1) > adcValue2)
 				{
 					direction_info = 0x02; //LEFT
-          Serial.print("Direction: ");
-          Serial.println("Left");
+          // Serial.print("Direction: ");
+          // Serial.println("Left");
 				}
 				else
 				{
 					direction_info = 0x04; //UP
-          Serial.print("Direction: ");
-          Serial.println("Up");
+          // Serial.print("Direction: ");
+          // Serial.println("Up");
+          return 2;
 				}
 			}
 			else if((adcValue1 == 0) && (adcValue2 > 0))
 			{
 				direction_info = 0x04; //UP
-        Serial.print("Direction: ");
-        Serial.println("Up");
+        // Serial.print("Direction: ");
+        // Serial.println("Up");
+        return 2;
 			}
 			else if((adcValue1 > 0) && (adcValue2 > 0))
 			{
 				if(adcValue1 > adcValue2)
 				{
 					direction_info = 0x01; //RIGHT
-          Serial.print("Direction: ");
-          Serial.println("Right");
+          // Serial.print("Direction: ");
+          // Serial.println("Right");
 				}
 				else
 				{
 					direction_info = 0x04; //UP
-          Serial.print("Direction: ");
-          Serial.println("Up");
+          // Serial.print("Direction: ");
+          // Serial.println("Up");
+          return 2;
 				}
 			}
 		}
+
+    return 0;
+}
+
+unsigned long time;
+
+int findDummyDirection()
+{
+  time = (millis() % 10000);
+  //Serial.println(time);
+
+   if(time < 5000)
+  {
+    return 1;
+  }
+  else
+  {
+    return 2;
+  }
 }
